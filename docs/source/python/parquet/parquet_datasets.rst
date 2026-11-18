@@ -97,9 +97,9 @@ Writing ``_metadata`` and ``_common_metadata`` files
 Some processing frameworks such as Spark or Dask (optionally) use ``_metadata``
 and ``_common_metadata`` files with partitioned datasets.
 
-Those files include information about the schema of the full dataset (for
-``_common_metadata``) and potentially all row group metadata of all files in the
-partitioned dataset as well (for ``_metadata``). The actual files are
+Both files contain the common schema of the Parquet data files.
+``_metadata`` also includes the row group metadata of all files in the
+partitioned dataset. The actual files are
 metadata-only Parquet files. Note this is not a Parquet standard, but a
 convention set in practice by those frameworks.
 
@@ -111,21 +111,27 @@ is expensive).
 
 The :func:`~pyarrow.parquet.write_to_dataset` function does not automatically
 write such metadata files, but you can use it to gather the metadata and
-combine and write them manually:
+combine and write them manually. With ``partition_cols``, the partition
+columns are stored in directory names, not in the Parquet files. Use the
+schema from a collected data file rather than the input table's schema:
 
 .. code-block:: python
 
    >>> # Write a dataset and collect metadata information of all written files
    >>> metadata_collector = []
    >>> root_path = "dataset_name_1"
-   >>> pq.write_to_dataset(table, root_path, metadata_collector=metadata_collector)
+   >>> pq.write_to_dataset(
+   ...     table, root_path, partition_cols=["two"],
+   ...     metadata_collector=metadata_collector,
+   ... )
+   >>> file_schema = metadata_collector[0].schema.to_arrow_schema()
 
    >>> # Write the ``_common_metadata`` parquet file without row groups statistics
-   >>> pq.write_metadata(table.schema, root_path + '/_common_metadata')
+   >>> pq.write_metadata(file_schema, root_path + '/_common_metadata')
 
    >>> # Write the ``_metadata`` parquet file with row groups statistics of all files
    >>> pq.write_metadata(
-   ...     table.schema, root_path + '/_metadata',
+   ...     file_schema, root_path + '/_metadata',
    ...     metadata_collector=metadata_collector
    ... )
 
